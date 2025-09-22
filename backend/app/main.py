@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from . import models, database, auth
 from .routers import news, auth as auth_router
 from sqlalchemy.orm import Session
@@ -15,6 +16,19 @@ app = FastAPI(
         "url": "http://localhost:8000",
         "email": "admin@example.com",
     }
+)
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # รวม router
