@@ -7,11 +7,11 @@ router = APIRouter(prefix="/news", tags=["News"])
 UPLOAD_DIR = "uploads"
 
 @router.get("/", response_model=list[schemas.NewsBase])
-def get_news(db: Session = Depends(database.SessionLocal)):
+def get_news(db: Session = Depends(database.get_db)):
     return db.query(models.News).order_by(models.News.created_at.desc()).all()
 
 @router.post("/", response_model=schemas.NewsBase)
-def create_news(news: schemas.NewsCreate, db: Session = Depends(database.SessionLocal), current_user: models.User = Depends(auth.get_current_user)):
+def create_news(news: schemas.NewsCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     new_news = models.News(title=news.title, content=news.content)
     db.add(new_news)
     db.commit()
@@ -19,7 +19,7 @@ def create_news(news: schemas.NewsCreate, db: Session = Depends(database.Session
     return new_news
 
 @router.post("/{news_id}/files", response_model=schemas.FileBase)
-def upload_file(news_id: int, file: UploadFile = File(...), db: Session = Depends(database.SessionLocal), current_user: models.User = Depends(auth.get_current_user)):
+def upload_file(news_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:

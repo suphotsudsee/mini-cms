@@ -19,7 +19,7 @@ def _authenticate_and_issue_token(db: Session, username: str, password: str) -> 
 
 @router.post("/token")
 async def login_form(request: Request,
-                     db: Session = Depends(database.SessionLocal)):
+                     db: Session = Depends(database.get_db)):
     """Accept login credentials via form data or JSON payloads."""
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
@@ -37,5 +37,5 @@ async def login_form(request: Request,
 
 @router.post("/login")
 def login_json(payload: schemas.UserLogin,
-               db: Session = Depends(database.SessionLocal)):
+               db: Session = Depends(database.get_db)):
     return _authenticate_and_issue_token(db, payload.username, payload.password)
