@@ -1,5 +1,8 @@
+import os
+
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
+
 from .database import Base
 
 class User(Base):
@@ -28,3 +31,11 @@ class File(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     news = relationship("News", back_populates="files")
+
+    @property
+    def is_image(self) -> bool:
+        """Return True when the stored file is likely an image."""
+        if not self.filename:
+            return False
+        _, ext = os.path.splitext(self.filename.lower())
+        return ext in {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"}

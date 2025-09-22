@@ -7,6 +7,7 @@ class FileBase(BaseModel):
     filename: str
     filepath: str
     uploaded_at: datetime
+    is_image: bool = False
     class Config:
         from_attributes = True
 
