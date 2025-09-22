@@ -23,7 +23,7 @@ def get_password_hash(password: str) -> str:
 def verify_password(password: str, hashed_pw: str) -> bool:
     return pwd_context.verify(password, hashed_pw)
 
-# สำคัญ: เปลี่ยน tokenUrl ให้ตรงกับ /auth/login (แบบ JSON)
+# tokenUrl สำหรับ OAuth2 (endpoint รองรับทั้ง form และ JSON)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
