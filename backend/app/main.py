@@ -1,9 +1,12 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+
 from . import models, database, auth
 from .routers import news, auth as auth_router
-from sqlalchemy.orm import Session
-import os
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -34,6 +37,10 @@ app.add_middleware(
 # รวม router
 app.include_router(auth_router.router)
 app.include_router(news.router)
+
+upload_dir = os.getenv("UPLOAD_DIR", "uploads")
+os.makedirs(upload_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
 
 @app.on_event("startup")
 def init_admin():

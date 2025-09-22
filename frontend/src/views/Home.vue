@@ -10,6 +10,9 @@ const error = ref('')
 
 const newsCount = computed(() => news.value.length)
 
+const imageFiles = (files) => (files || []).filter((file) => file?.is_image)
+const otherFiles = (files) => (files || []).filter((file) => !file?.is_image)
+
 const formatDate = (value) =>
   new Intl.DateTimeFormat('th-TH', {
     dateStyle: 'long',
@@ -153,11 +156,27 @@ onMounted(fetchNews)
             </div>
           </div>
 
-          <div v-if="item.files?.length" class="mt-6 space-y-3">
-            <p class="text-sm font-medium text-slate-200">ไฟล์แนบ</p>
+          <div v-if="imageFiles(item.files).length" class="mt-6 space-y-3">
+            <p class="text-sm font-medium text-slate-200">รูปภาพประกอบ</p>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <figure
+                v-for="file in imageFiles(item.files)"
+                :key="`image-${file.id}`"
+                class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60"
+              >
+                <img :src="resolveFileUrl(file.filepath)" :alt="file.filename" class="h-56 w-full object-cover" />
+                <figcaption class="border-t border-slate-800/60 px-4 py-2 text-xs text-slate-400">
+                  {{ file.filename }}
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <div v-if="otherFiles(item.files).length" class="mt-6 space-y-3">
+            <p class="text-sm font-medium text-slate-200">ไฟล์แนบอื่น ๆ</p>
             <ul class="grid gap-3 sm:grid-cols-2">
               <li
-                v-for="file in item.files"
+                v-for="file in otherFiles(item.files)"
                 :key="file.id"
                 class="group/file flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300 transition hover:border-sky-500/30 hover:bg-sky-500/10"
               >
