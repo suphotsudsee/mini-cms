@@ -10,6 +10,24 @@ const error = ref('')
 
 const newsCount = computed(() => news.value.length)
 
+const searchQuery = ref('')
+const hasSearch = computed(() => searchQuery.value.trim().length > 0)
+const filteredNews = computed(() => {
+  if (!hasSearch.value) {
+    return news.value
+  }
+
+  const query = searchQuery.value.trim().toLowerCase()
+
+  return news.value.filter((item) => {
+    const title = item.title?.toLowerCase() || ''
+    const content = item.content?.toLowerCase() || ''
+    const id = String(item.id || '').toLowerCase()
+
+    return title.includes(query) || content.includes(query) || id.includes(query)
+  })
+})
+
 const imageFiles = (files) => (files || []).filter((file) => file?.is_image)
 const otherFiles = (files) => (files || []).filter((file) => !file?.is_image)
 
@@ -93,17 +111,29 @@ onMounted(fetchNews)
     </section>
 
     <section class="space-y-6">
-      <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 class="text-2xl font-semibold text-white">ข่าวสารล่าสุด</h2>
           <p class="text-sm text-slate-400">อัปเดตเรียลไทม์จากระบบ Mini CMS Backend</p>
         </div>
-        <RouterLink
-          :to="{ name: 'Dashboard' }"
-          class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2 text-sm font-medium text-sky-200 transition hover:border-sky-500/40 hover:bg-sky-500/10"
-        >
-          สำหรับผู้ดูแลระบบ
-        </RouterLink>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div class="relative w-full sm:w-72">
+            <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-500">🔍</span>
+            <input
+              v-model="searchQuery"
+              type="search"
+              class="w-full rounded-full border border-slate-800 bg-slate-900/70 py-2 pl-11 pr-4 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+              placeholder="ค้นหาข่าวด้วยคำสำคัญ..."
+              aria-label="ค้นหาข่าว"
+            />
+          </div>
+          <RouterLink
+            :to="{ name: 'Dashboard' }"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2 text-sm font-medium text-sky-200 transition hover:border-sky-500/40 hover:bg-sky-500/10"
+          >
+            สำหรับผู้ดูแลระบบ
+          </RouterLink>
+        </div>
       </header>
 
       <div v-if="loading" class="grid gap-4">
@@ -129,78 +159,97 @@ onMounted(fetchNews)
         </div>
       </div>
 
-      <div v-else class="grid gap-6">
-        <article
-          v-for="item in news"
-          :key="item.id"
-          class="group rounded-3xl border border-slate-800 bg-slate-900/50 p-8 transition hover:border-sky-500/40 hover:bg-slate-900/80"
-        >
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-3">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-500">#{{ item.id }}</p>
-              <h3 class="text-2xl font-semibold text-white transition group-hover:text-sky-300">
-                {{ item.title }}
-              </h3>
-              <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-                {{ item.content }}
-              </p>
+      <div v-else>
+        <div v-if="filteredNews.length" class="grid gap-6">
+          <article
+            v-for="item in filteredNews"
+            :key="item.id"
+            class="group rounded-3xl border border-slate-800 bg-slate-900/50 p-8 transition hover:border-sky-500/40 hover:bg-slate-900/80"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="space-y-3">
+                <p class="text-xs uppercase tracking-[0.25em] text-slate-500">#{{ item.id }}</p>
+                <h3 class="text-2xl font-semibold text-white transition group-hover:text-sky-300">
+                  {{ item.title }}
+                </h3>
+                <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                  {{ item.content }}
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-2 text-right text-sm text-slate-400">
+                <span class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1">
+                  <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                  เผยแพร่เมื่อ {{ formatDate(item.created_at) }}
+                </span>
+                <span v-if="item.updated_at" class="text-xs text-slate-500">
+                  แก้ไขล่าสุด {{ formatDate(item.updated_at) }}
+                </span>
+              </div>
             </div>
-            <div class="flex flex-col items-end gap-2 text-right text-sm text-slate-400">
-              <span class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1">
-                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                เผยแพร่เมื่อ {{ formatDate(item.created_at) }}
-              </span>
-              <span v-if="item.updated_at" class="text-xs text-slate-500">
-                แก้ไขล่าสุด {{ formatDate(item.updated_at) }}
-              </span>
-            </div>
-          </div>
 
-          <div v-if="imageFiles(item.files).length" class="mt-6 space-y-3">
-            <p class="text-sm font-medium text-slate-200">รูปภาพประกอบ</p>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <figure
-                v-for="file in imageFiles(item.files)"
-                :key="`image-${file.id}`"
-                class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60"
-              >
-                <img :src="resolveFileUrl(file.filepath)" :alt="file.filename" class="h-56 w-full object-cover" />
-                <figcaption class="border-t border-slate-800/60 px-4 py-2 text-xs text-slate-400">
-                  {{ file.filename }}
-                </figcaption>
-              </figure>
-            </div>
-          </div>
-
-          <div v-if="otherFiles(item.files).length" class="mt-6 space-y-3">
-            <p class="text-sm font-medium text-slate-200">ไฟล์แนบอื่น ๆ</p>
-            <ul class="grid gap-3 sm:grid-cols-2">
-              <li
-                v-for="file in otherFiles(item.files)"
-                :key="file.id"
-                class="group/file flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300 transition hover:border-sky-500/30 hover:bg-sky-500/10"
-              >
-                <div class="flex items-center gap-3">
-                  <span class="grid h-10 w-10 place-items-center rounded-full bg-slate-800/80 text-sky-300 group-hover/file:bg-sky-500/20">
-                    📎
-                  </span>
-                  <div>
-                    <p class="font-medium text-slate-100 group-hover/file:text-sky-200">{{ file.filename }}</p>
-                    <p class="text-xs text-slate-500">อัปโหลดเมื่อ {{ formatDate(file.uploaded_at) }}</p>
-                  </div>
-                </div>
-                <a
-                  :href="resolveFileUrl(file.filepath)"
-                  class="text-xs font-semibold uppercase tracking-wider text-sky-300 hover:text-sky-200"
-                  target="_blank"
-                  rel="noopener"
+            <div v-if="imageFiles(item.files).length" class="mt-6 space-y-3">
+              <p class="text-sm font-medium text-slate-200">รูปภาพประกอบ</p>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <figure
+                  v-for="file in imageFiles(item.files)"
+                  :key="`image-${file.id}`"
+                  class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60"
                 >
-                  ดาวน์โหลด
-                </a>
-              </li>
-            </ul>
+                  <img :src="resolveFileUrl(file.filepath)" :alt="file.filename" class="h-56 w-full object-cover" />
+                  <figcaption class="border-t border-slate-800/60 px-4 py-2 text-xs text-slate-400">
+                    {{ file.filename }}
+                  </figcaption>
+                </figure>
+              </div>
+            </div>
+
+            <div v-if="otherFiles(item.files).length" class="mt-6 space-y-3">
+              <p class="text-sm font-medium text-slate-200">ไฟล์แนบอื่น ๆ</p>
+              <ul class="grid gap-3 sm:grid-cols-2">
+                <li
+                  v-for="file in otherFiles(item.files)"
+                  :key="file.id"
+                  class="group/file flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300 transition hover:border-sky-500/30 hover:bg-sky-500/10"
+                >
+                  <div class="flex items-center gap-3">
+                    <span class="grid h-10 w-10 place-items-center rounded-full bg-slate-800/80 text-sky-300 group-hover/file:bg-sky-500/20">
+                      📎
+                    </span>
+                    <div>
+                      <p class="font-medium text-slate-100 group-hover/file:text-sky-200">{{ file.filename }}</p>
+                      <p class="text-xs text-slate-500">อัปโหลดเมื่อ {{ formatDate(file.uploaded_at) }}</p>
+                    </div>
+                  </div>
+                  <a
+                    :href="resolveFileUrl(file.filepath)"
+                    class="text-xs font-semibold uppercase tracking-wider text-sky-300 hover:text-sky-200"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    ดาวน์โหลด
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </article>
+        </div>
+        <div
+          v-else
+          class="grid place-items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-16 text-center text-slate-400"
+        >
+          <div class="space-y-2">
+            <p class="text-lg font-semibold text-slate-200">ไม่พบข่าวที่ตรงกับการค้นหา</p>
+            <p class="text-sm">ลองเปลี่ยนคำค้นหาหรือเคลียร์การค้นหาเพื่อดูข่าวทั้งหมด</p>
           </div>
-        </article>
+          <button
+            v-if="hasSearch"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2 text-sm font-medium text-sky-200 transition hover:border-sky-500/40 hover:bg-sky-500/10"
+            @click="searchQuery = ''"
+          >
+            ล้างการค้นหา
+          </button>
+        </div>
       </div>
     </section>
   </div>
