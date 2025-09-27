@@ -20,7 +20,7 @@ class News(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    files = relationship("File", back_populates="news")
+    files = relationship("File", back_populates="news", cascade="all, delete-orphan")
 
 class File(Base):
     __tablename__ = "files"
