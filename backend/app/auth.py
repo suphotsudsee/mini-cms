@@ -21,7 +21,20 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(password: str, hashed_pw: str) -> bool:
-    return pwd_context.verify(password, hashed_pw)
+    """Return True when the password matches the stored hash.
+
+    ``passlib`` will raise ``ValueError`` when a password longer than the
+    supported bcrypt limit (72 bytes) is supplied.  Instead of bubbling that
+    up and causing a 500 response, treat it as a failed verification so the
+    caller can respond with a normal 401.
+    """
+
+    try:
+        return pwd_context.verify(password, hashed_pw)
+    except ValueError:
+        # Treat overly long passwords (or other value errors) as a
+        # verification failure instead of triggering an internal error.
+        return False
 
 # tokenUrl สำหรับ OAuth2 (endpoint รองรับทั้ง form และ JSON)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
