@@ -21,10 +21,22 @@ app = FastAPI(
     }
 )
 
-origins = [
+# รวบรวมรายการ origin ที่อนุญาตให้ frontend เรียกใช้งาน API ได้
+# ค่าพื้นฐานจะครอบคลุมการพัฒนาในเครื่องทั่วไป และสามารถปรับเพิ่มได้ผ่าน
+# ตัวแปรสภาพแวดล้อม `CORS_ALLOW_ORIGINS` (คั่นด้วยเครื่องหมายจุลภาค)
+default_origins = {
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-]
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+}
+
+extra_origins = os.getenv("CORS_ALLOW_ORIGINS", "")
+if extra_origins:
+    # ตัดช่องว่างและละเว้นค่าเปล่า เพื่อป้องกัน header ที่ไม่ถูกต้อง
+    default_origins.update({origin.strip() for origin in extra_origins.split(",") if origin.strip()})
+
+origins = sorted(default_origins)
 
 app.add_middleware(
     CORSMiddleware,
