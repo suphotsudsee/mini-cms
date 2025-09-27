@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api, { resolveFileUrl } from '../services/api'
 import { useAuthStore } from '../stores/auth'
@@ -15,6 +15,14 @@ const createState = reactive({ title: '', content: '' })
 const createLoading = ref(false)
 const createMessage = ref('')
 const uploadState = reactive({})
+const editingId = ref(null)
+const editState = reactive({ title: '', content: '' })
+const editLoading = ref(false)
+const editFeedback = reactive({ message: '', status: 'info' })
+const deletingId = ref(null)
+const deleteErrors = reactive({})
+
+let editResetTimer = null
 
 const hasNews = computed(() => news.value.length > 0)
 
@@ -60,6 +68,71 @@ const refresh = async () => {
 const resetCreateForm = () => {
   createState.title = ''
   createState.content = ''
+}
+
+const resetEditState = () => {
+  editState.title = ''
+  editState.content = ''
+  editFeedback.message = ''
+  editFeedback.status = 'info'
+  if (editResetTimer) {
+    clearTimeout(editResetTimer)
+    editResetTimer = null
+  }
+}
+
+const startEdit = (item) => {
+  if (editResetTimer) {
+    clearTimeout(editResetTimer)
+    editResetTimer = null
+  }
+  editingId.value = item.id
+  editState.title = item.title
+  editState.content = item.content
+  editFeedback.message = ''
+  editFeedback.status = 'info'
+  deleteErrors[item.id] = ''
+}
+
+const cancelEdit = () => {
+  editingId.value = null
+  resetEditState()
+}
+
+const handleEditSubmit = async (newsId) => {
+  if (!editState.title.trim() || !editState.content.trim()) {
+    editFeedback.message = 'กรุณากรอกหัวข้อและเนื้อหาให้ครบถ้วน'
+    editFeedback.status = 'error'
+    return
+  }
+
+  editLoading.value = true
+  editFeedback.message = ''
+
+  try {
+    const { data } = await api.put(`/news/${newsId}`, {
+      title: editState.title.trim(),
+      content: editState.content.trim(),
+    })
+    const index = news.value.findIndex((item) => item.id === newsId)
+    if (index !== -1) {
+      news.value.splice(index, 1, data)
+    }
+    editFeedback.message = 'แก้ไขข่าวสำเร็จ'
+    editFeedback.status = 'success'
+    editResetTimer = window.setTimeout(() => {
+      cancelEdit()
+    }, 1200)
+  } catch (err) {
+    if (err.response?.status === 401) {
+      handleUnauthorized()
+      return
+    }
+    editFeedback.message = err.response?.data?.detail || err.message || 'ไม่สามารถแก้ไขข่าวได้'
+    editFeedback.status = 'error'
+  } finally {
+    editLoading.value = false
+  }
 }
 
 const handleCreate = async () => {
@@ -127,7 +200,38 @@ const onFileChange = (event, newsId) => {
   event.target.value = ''
 }
 
+const handleDelete = async (newsId) => {
+  if (typeof window !== 'undefined' && !window.confirm('ต้องการลบข่าวนี้หรือไม่?')) {
+    return
+  }
+  deleteErrors[newsId] = ''
+  deletingId.value = newsId
+  try {
+    await api.delete(`/news/${newsId}`)
+    news.value = news.value.filter((item) => item.id !== newsId)
+    delete uploadState[newsId]
+    delete deleteErrors[newsId]
+    if (editingId.value === newsId) {
+      cancelEdit()
+    }
+  } catch (err) {
+    if (err.response?.status === 401) {
+      handleUnauthorized()
+      return
+    }
+    deleteErrors[newsId] = err.response?.data?.detail || err.message || 'ไม่สามารถลบข่าวได้'
+  } finally {
+    deletingId.value = null
+  }
+}
+
 onMounted(fetchNews)
+
+onBeforeUnmount(() => {
+  if (editResetTimer) {
+    clearTimeout(editResetTimer)
+  }
+})
 </script>
 
 <template>
@@ -194,12 +298,93 @@ onMounted(fetchNews)
             class="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-lg shadow-emerald-500/5"
           >
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div class="space-y-2">
+              <div class="space-y-4 md:flex-1">
                 <p class="text-xs uppercase tracking-[0.25em] text-slate-500">รหัสข่าว #{{ item.id }}</p>
-                <h3 class="text-2xl font-semibold text-white">{{ item.title }}</h3>
-                <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{{ item.content }}</p>
+                <template v-if="editingId === item.id">
+                  <form class="space-y-4" @submit.prevent="handleEditSubmit(item.id)">
+                    <div class="space-y-2">
+                      <label class="block text-sm font-medium text-slate-200" :for="`edit-title-${item.id}`">หัวข้อข่าว</label>
+                      <input
+                        :id="`edit-title-${item.id}`"
+                        v-model="editState.title"
+                        type="text"
+                        class="w-full rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                        placeholder="แก้ไขหัวข้อข่าว"
+                      />
+                    </div>
+                    <div class="space-y-2">
+                      <label class="block text-sm font-medium text-slate-200" :for="`edit-content-${item.id}`">รายละเอียดข่าว</label>
+                      <textarea
+                        :id="`edit-content-${item.id}`"
+                        v-model="editState.content"
+                        rows="6"
+                        class="w-full rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40"
+                        placeholder="แก้ไขรายละเอียดข่าว"
+                      ></textarea>
+                    </div>
+                    <div
+                      v-if="editFeedback.message"
+                      class="rounded-2xl border px-4 py-3 text-sm"
+                      :class="editFeedback.status === 'success'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100'
+                        : 'border-red-500/40 bg-red-500/10 text-red-100'"
+                    >
+                      {{ editFeedback.message }}
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                      <button
+                        type="submit"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="editLoading"
+                      >
+                        <span v-if="editLoading" class="h-4 w-4 animate-spin rounded-full border-2 border-slate-900 border-t-transparent"></span>
+                        <span>บันทึกการแก้ไข</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800/60"
+                        @click="cancelEdit"
+                        :disabled="editLoading"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </form>
+                </template>
+                <template v-else>
+                  <h3 class="text-2xl font-semibold text-white">{{ item.title }}</h3>
+                  <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{{ item.content }}</p>
+                </template>
               </div>
-              <div class="flex flex-col items-end gap-2 text-right text-xs text-slate-500">
+              <div class="flex flex-col items-end gap-3 text-right text-xs text-slate-500">
+                <div class="flex flex-wrap justify-end gap-2 text-sm">
+                  <button
+                    v-if="editingId !== item.id"
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-full border border-emerald-400/60 bg-emerald-500/10 px-3 py-1 text-emerald-100 transition hover:bg-emerald-400/30"
+                    @click="startEdit(item)"
+                  >
+                    แก้ไข
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1 text-slate-200 transition hover:bg-slate-700/60 disabled:cursor-not-allowed disabled:opacity-60"
+                    @click="cancelEdit"
+                    :disabled="editLoading"
+                  >
+                    ยกเลิกการแก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 text-red-100 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    @click="handleDelete(item.id)"
+                    :disabled="deletingId === item.id"
+                  >
+                    <span v-if="deletingId === item.id" class="h-3 w-3 animate-spin rounded-full border border-red-200 border-t-transparent"></span>
+                    <span>{{ deletingId === item.id ? 'กำลังลบ' : 'ลบ' }}</span>
+                  </button>
+                </div>
                 <span class="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1 text-slate-300">
                   เผยแพร่ {{ formatDate(item.created_at) }}
                 </span>
@@ -208,6 +393,12 @@ onMounted(fetchNews)
             </div>
 
             <div class="mt-6 space-y-4">
+              <div
+                v-if="deleteErrors[item.id]"
+                class="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+              >
+                {{ deleteErrors[item.id] }}
+              </div>
               <div class="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
                   <p class="text-sm font-medium text-slate-100">อัปโหลดไฟล์แนบ</p>
